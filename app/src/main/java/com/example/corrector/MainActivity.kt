@@ -1,18 +1,22 @@
 package com.example.corrector
 
 import android.content.pm.PackageManager
+import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import kotlinx.android.synthetic.main.activity_main.*
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.jar.Manifest
@@ -47,7 +51,36 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    private fun takePhoto(){}
+    private fun takePhoto(){
+          val imageCapture = imageCapture ?: return
+
+        val photoFile = File(
+                outputDirectory,
+                SimpleDateFormat(FILENAME_FORMAT , Locale.US)
+                        .format(System.currentTimeMillis()) + ".jpg")
+
+
+        val outputOption = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+
+      imageCapture.takePicture(outputOption,ContextCompat.getMainExecutor(this) ,
+              object : ImageCapture.OnImageSavedCallback{
+
+                  override fun onError(exception: ImageCaptureException) {
+                      Log.e(TAG , "photo capture failed : ${exception.message}" , exception)
+                  }
+
+
+                  override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                      val savedUri = Uri.fromFile(photoFile)
+                      val msg = "photo capture succeed :$savedUri"
+                      Toast.makeText(baseContext , msg , Toast.LENGTH_SHORT).show()
+                      Log.d(TAG , msg)
+
+                  }
+              }
+      )
+
+    }
 
     private fun startCamera(){
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
@@ -63,6 +96,9 @@ class MainActivity : AppCompatActivity() {
                     it.setSurfaceProvider(viewFinder.createSurfaceProvider())
                 }
 
+            imageCapture = ImageCapture.Builder()
+                    .build()
+
             // Select back camera as a default
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
@@ -72,13 +108,15 @@ class MainActivity : AppCompatActivity() {
 
                 // Bind use cases to camera
                 cameraProvider.bindToLifecycle(
-                    this, cameraSelector, preview)
+                    this, cameraSelector, preview ,imageCapture )
 
             } catch(exc: Exception) {
                 Log.e(TAG, "Use case binding failed", exc)
             }
 
         }, ContextCompat.getMainExecutor(this))
+
+
     }
 
     private fun allPermissionGranted() = REQUIRED_PERMISSIONS.all{
